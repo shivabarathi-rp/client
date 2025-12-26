@@ -12,14 +12,15 @@ export default function SignupPage() {
     gender: '',
     phone: '',
     occupation: '',
-    accountHolderName: '',
-    bankName: '',
-    accountNumber: '',
-    ifscCode: '',
     upiId: '',
+    referral: '',
   });
 
   const [isGovtEmployee, setIsGovtEmployee] = useState(false);
+  // const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const genderOptions = [
     { value: 'male', label: 'Male' },
@@ -36,13 +37,58 @@ export default function SignupPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const submitData = {
-      ...formData,
-      isGovtEmployee,
-    };
-    console.log('Signup form submitted:', submitData);
+    setError('');
+
+    // Validate phone number
+    if (formData.phone.length !== 10) {
+      setError('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Send OTP to phone number
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formData.phone }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to send OTP');
+      }
+
+      // Show OTP dialog on success
+      // setShowOtpDialog(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send OTP');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -127,6 +173,16 @@ export default function SignupPage() {
           />
 
 
+          <InputField
+            label="Referral Code"
+            type="text"
+            name="referral"
+            value={formData.referral}
+            onChange={handleChange}
+            placeholder="Enter Your Code"
+          />
+
+
           {/* Government Employee Toggle */}
           <div className="w-full">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -142,12 +198,18 @@ export default function SignupPage() {
             </label>
           </div>
 
+          {/* Error Message */}
+          {/* {error && !showOtpDialog && (
+            <p className="text-red-500 text-sm text-center">{error}</p>
+          )} */}
+
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-2.5 px-4 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            disabled={isLoading}
+            className="w-full py-2.5 px-4 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign Up
+            {isLoading ? 'Sending OTP...' : 'Sign Up'}
           </button>
 
           {/* Login Link */}
@@ -162,6 +224,99 @@ export default function SignupPage() {
           </p>
         </form>
       </div>
+
+      {/* OTP Verification Dialog */}
+      {(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+            {/* Dialog Header */}
+            <div className="bg-gradient-to-r from-gray-800 to-gray-700 px-6 py-4">
+              <h3 className="text-xl font-bold text-white text-center">
+                Verify Phone Number
+              </h3>
+            </div>
+
+            {/* Dialog Content */}
+            <div className="p-6">
+              <p className="text-center text-gray-600 mb-6">
+                Enter the 6-digit OTP sent to<br />
+                <span className="font-semibold text-gray-800">+91 {formData.phone}</span>
+              </p>
+
+              {/* OTP Input Fields */}
+              <div className="flex justify-center gap-2 mb-6">
+                {otp.map((digit, index) => (
+                  <input
+                    key={index}
+                    id={`otp-${index}`}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                    className="w-10 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-gray-800 focus:outline-none transition-colors"
+                  />
+                ))}
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <p className="text-red-500 text-sm text-center mb-4">{error}</p>
+              )}
+
+              {/* Verify Button */}
+              <button
+                // onClick={verifyOtpAndSignup}
+                disabled={isLoading}
+                className="w-full py-2.5 px-4 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+              >
+                {isLoading ? 'Verifying...' : 'Verify & Sign Up'}
+              </button>
+
+              {/* Resend OTP */}
+              <button
+                onClick={async () => {
+                  setOtp(['', '', '', '', '', '']);
+                  setError('');
+                  setIsLoading(true);
+                  try {
+                    const response = await fetch('/api/otp/send', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ phone: formData.phone }),
+                    });
+                    if (!response.ok) {
+                      const data = await response.json();
+                      throw new Error(data.message || 'Failed to resend OTP');
+                    }
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Failed to resend OTP');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading}
+                className="w-full py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors disabled:opacity-50"
+              >
+                Resend OTP
+              </button>
+
+              {/* Cancel Button */}
+              <button
+                onClick={() => {
+                  // setShowOtpDialog(false);
+                  setOtp(['', '', '', '', '', '']);
+                  setError('');
+                }}
+                className="w-full py-2 text-gray-500 text-sm hover:text-gray-700 transition-colors mt-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
