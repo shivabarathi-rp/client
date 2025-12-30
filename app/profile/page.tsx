@@ -1,6 +1,22 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getUser, User } from '@/utils/auth';
+
 export default function ProfilePage() {
+    const [user, setUser] = useState<User | null>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        const userData = getUser();
+        if (!userData) {
+            router.push('/login');
+            return;
+        }
+        setUser(userData);
+    }, [router]);
+
     const profileData = [
         {
             label: 'Fund Balance',
@@ -15,8 +31,8 @@ export default function ProfilePage() {
             color: 'from-purple-500 to-pink-500',
         },
         {
-            label: 'Invested Rupees',
-            value: '₹0.00',
+            label: 'Invested Amount',
+            value: `₹${user?.investedamount.toLocaleString('en-IN') || '0.00'}`,
             icon: '💵',
             color: 'from-green-500 to-emerald-500',
         },
@@ -74,7 +90,7 @@ export default function ProfilePage() {
                             >
                                 {/* Gradient accent bar */}
                                 <div className={`h-1 bg-gradient-to-r ${data.color} rounded-t-xl absolute top-0 left-0 right-0`}></div>
-                                
+
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
                                         <p className="text-sm text-gray-600 uppercase tracking-wider mb-2">
